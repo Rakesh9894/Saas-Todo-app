@@ -1,6 +1,6 @@
+.terraform/
+*.tfstate
+*.tfstate.backup
 node_modules/
-dist/
-build/
-.env
+__pycache__/
 *.log
-
