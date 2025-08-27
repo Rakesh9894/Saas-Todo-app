@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: todo-container
-        image: rakesh9894/todo-saas-app:v1
+        image: IMAGE_PLACEHOLDER
         ports:
         - containerPort: 3000
         resources:

@@ -1,0 +1,28 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: todo-smoke-test
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      containers:
+      - name: curl
+        image: curlimages/curl:7.88.1
+        command:
+        - sh
+        - -c
+        - |
+          # attempt curl internal service
+          echo "Waiting for service..."
+          for i in $(seq 1 20); do
+            sleep 3
+            if curl -sS http://todo-service:3000/ | grep -q "My To-Do List"; then
+              echo "smoke test success"
+              exit 0
+            fi
+          done
+          echo "smoke test failed"
+          exit 1
+      restartPolicy: Never
+
