@@ -1,0 +1,114 @@
+pipeline {
+  agent any
+
+  environment {
+    DOCKER_REG = "docker.io"
+    DOCKER_IMAGE_REPO = "rakesh9894/todo-saas-app"     // <<< change to your image repo
+    KUBECONFIG_CRED_ID = 'kubeconfig-cred'             // Secret file credential id
+    DOCKERHUB_CRED = 'dockerhub-cred'                  // DockerHub username/password id
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        git url: 'https://github.com/Rakesh9894/Saas-Todo-app.git', branch: 'main'
+      }
+    }
+
+    stage('Lint & Test') {
+      steps {
+        script {
+          // If there are unit tests, run them. If not, run a simple node check
+          sh 'node -v || true'
+          sh 'npm install || true'
+          // If you have tests: sh 'npm test'
+        }
+      }
+    }
+
+    stage('Build Docker Image') {
+      steps {
+        script {
+          // use short git sha for image tag
+          def GITSHA = sh(returnStdout: true, script: "git rev-parse --short HEAD").trim()
+          env.IMAGE_TAG = "${DOCKER_IMAGE_REPO}:${GITSHA}"
+          sh "docker build -t ${env.IMAGE_TAG} ."
+        }
+      }
+    }
+
+    stage('Push Docker Image') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CRED}", usernameVariable: 'DH_USER', passwordVariable: 'DH_PASS')]) {
+          sh 'echo $DH_PASS | docker login -u $DH_USER --password-stdin'
+          sh "docker push ${env.IMAGE_TAG}"
+        }
+      }
+    }
+
+    stage('Prepare kubeconfig') {
+      steps {
+        withCredentials([file(credentialsId: "${KUBECONFIG_CRED_ID}", variable: 'KUBECONFIG_FILE')]) {
+          sh '''
+            mkdir -p $HOME/.kube
+            cp "${KUBECONFIG_FILE}" $HOME/.kube/config
+            chmod 600 $HOME/.kube/config
+            kubectl config current-context
+          '''
+        }
+      }
+    }
+
+    stage('Deploy to Staging') {
+      steps {
+        script {
+          // Replace placeholder image in deployment manifest and apply in staging
+          sh """
+            sed 's|IMAGE_PLACEHOLDER|${env.IMAGE_TAG}|g' k8s/deployment.yaml | kubectl apply -n staging -f -
+            kubectl apply -n staging -f k8s/service.yaml      # service (ClusterIP ok for staging)
+            kubectl apply -n staging -f k8s/hpa.yml
+            kubectl rollout status deploy/todo-deployment -n staging --timeout=120s
+          """
+        }
+      }
+    }
+
+    stage('Smoke Test Staging') {
+      steps {
+        script {
+          // create job, wait for completion
+          sh """
+            kubectl apply -n staging -f k8s/smoke-test-job.yaml
+            # wait for job to succeed (timeout 2m)
+            kubectl wait --for=condition=complete job/todo-smoke-test -n staging --timeout=120s
+          """
+        }
+      }
+    }
+
+    stage('Deploy to Production (promote)') {
+      steps {
+        script {
+          // apply deployment with same image in production, create LB service
+          sh """
+            sed 's|IMAGE_PLACEHOLDER|${env.IMAGE_TAG}|g' k8s/deployment.yaml | kubectl apply -n production -f -
+            kubectl apply -n production -f k8s/service.yaml
+            kubectl apply -n production -f k8s/hpa.yml
+            kubectl rollout status deploy/todo-deployment -n production --timeout=120s
+          """
+        }
+      }
+    }
+
+    stage('Post-deploy verify') {
+      steps {
+        sh """
+          kubectl get pods -n production
+          kubectl get svc -n production
+        """
+      }
+    }
+  }
+
+
+}
