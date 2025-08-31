@@ -52,16 +52,4 @@ data:
         kubernetes_sd_configs:
         - role: pod
 ---
-apiVersion: v1
-kind: Service
-metadata:
-  name: prometheus
-  namespace: monitoring
-spec:
-  type: NodePort
-  ports:
-  - port: 9090
-    targetPort: 9090
-    nodePort: 30090
-  selector:
-    app: prometheus
+
