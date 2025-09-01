@@ -1,5 +1,6 @@
 const express = require("express");
 const bodyParser = require("body-parser");
+const client = require("prom-client"); //  Add Prometheus client
 
 const app = express();
 const PORT = 3000;
@@ -9,6 +10,24 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // In-memory task storage
 let tasks = [];
+
+//  Create Prometheus Registry
+const register = new client.Registry();
+client.collectDefaultMetrics({ register });
+
+//  Custom Counter for API requests
+const httpRequestsTotal = new client.Counter({
+  name: "http_requests_total",
+  help: "Total number of requests",
+  labelNames: ["method", "route"]
+});
+register.registerMetric(httpRequestsTotal);
+
+//  Middleware to count requests
+app.use((req, res, next) => {
+  httpRequestsTotal.labels(req.method, req.path).inc();
+  next();
+});
 
 // Serve the UI
 app.get("/", (req, res) => {
@@ -124,6 +143,12 @@ app.post("/delete", (req, res) => {
   const index = req.body.index;
   tasks.splice(index, 1);
   res.redirect("/");
+});
+
+//  Add /metrics endpoint
+app.get("/metrics", async (req, res) => {
+  res.set("Content-Type", register.contentType);
+  res.end(await register.metrics());
 });
 
 // Start server
