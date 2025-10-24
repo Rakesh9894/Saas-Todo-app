@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
       - name: todo-container
-        image: rakesh9894/todo-saas-app
+        image: todo-app:latest
         ports:
         - containerPort: 3000
         resources:
