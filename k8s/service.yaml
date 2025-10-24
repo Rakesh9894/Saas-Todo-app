@@ -4,7 +4,7 @@ metadata:
   name: todo-service
   namespace: default
 spec:
-  type: LoadBalancer
+  type: NodePort
   selector:
     app: todo
   ports:
