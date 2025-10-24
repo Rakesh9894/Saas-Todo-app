@@ -2,7 +2,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: todo-smoke-test
-  namespace: staging
+  namespace: default
 spec:
   template:
     spec:
