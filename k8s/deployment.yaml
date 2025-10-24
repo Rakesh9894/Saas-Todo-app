@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
       - name: todo-container
-        image: IMAGE_PLACEHOLDER   # <-- Jenkins replaces this automatically
+        image: rakesh9894/todo-saas-app
         ports:
         - containerPort: 3000
         resources:
